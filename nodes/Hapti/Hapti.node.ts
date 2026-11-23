@@ -124,6 +124,7 @@ export class Hapti implements INodeType {
 				displayOptions: { show: { operation: ['run', 'create'] } },
 				options: [
 					{ displayName: 'Data (JSON)', name: 'data', type: 'json', default: '{}', description: 'Values the agent may use, such as names, references or dates. It never invents a missing one.' },
+					{ displayName: 'Files (Binary Properties)', name: 'files', type: 'string', default: '', placeholder: 'data, attachment_0', description: 'Comma-separated binary properties of the input item to give the agent: it reads them (a screenshot, a photo, a scan, a PDF) to type the values they hold, and uploads them when the site asks for a file' },
 					{ displayName: 'Locale', name: 'locale', type: 'string', default: '', placeholder: 'fr-FR', description: 'Language and region of the browser' },
 					{ displayName: 'Max Price (Cents)', name: 'max_price_cents', type: 'number', typeOptions: { minValue: 0 }, default: 0, description: 'Stop rather than spend more than this; 0 means no limit' },
 					{ displayName: 'Max Seconds', name: 'max_seconds', type: 'number', typeOptions: { minValue: 30, maxValue: 1800 }, default: 600 },
@@ -167,6 +168,15 @@ export class Hapti implements INodeType {
 					if (o.proxy) body.proxy = true;
 					if (o.locale) body.locale = o.locale;
 					if (o.webhook) body.webhook = o.webhook;
+					if (o.files) {
+						const files: IDataObject[] = [];
+						for (const property of String(o.files).split(',').map((f) => f.trim()).filter(Boolean)) {
+							const meta = this.helpers.assertBinaryData(itemIndex, property);
+							const content = await this.helpers.getBinaryDataBuffer(itemIndex, property);
+							files.push({ name: meta.fileName || `${property}${meta.fileExtension ? `.${meta.fileExtension}` : ''}`, base64: content.toString('base64') });
+						}
+						if (files.length) body.files = files;
+					}
 					task = await call('POST', '/v1/tasks', body);
 					if (operation === 'run') {
 						const until = Date.now() + (this.getNodeParameter('waitMinutes', itemIndex, 15) as number) * 60000;

@@ -23,7 +23,7 @@ Create a key on the developers screen of [app.hapti.dev](https://app.hapti.dev),
 | Approve or Refuse | Answers the approval a waiting task asked for |
 | Cancel | Stops a task; a cancelled task is never billed |
 
-A task needs a **Website URL** and a **Goal** in plain words, in any language. Options: **Data** (values the agent may use; it never invents a missing one), **Output Schema** (a JSON Schema the result follows, in `result.data`), **User** (the person the task is for: they keep their browser, sign-ins, inbox and vault from task to task), **Saved Accounts**, **Max Seconds**, **Max Price**, **Residential Proxy**, **Locale** and **Webhook URL**.
+A task needs a **Website URL** and a **Goal** in plain words, in any language. Options: **Files** (binary properties of the input item, such as an email attachment or an uploaded screenshot: the agent reads them to type the values they hold, and uploads them when the site asks for a file), **Data** (values the agent may use; it never invents a missing one), **Output Schema** (a JSON Schema the result follows, in `result.data`), **User** (the person the task is for: they keep their browser, sign-ins, inbox and vault from task to task), **Saved Accounts**, **Max Seconds**, **Max Price**, **Residential Proxy**, **Locale** and **Webhook URL**.
 
 The node can also be used as a tool by the n8n AI Agent.
 

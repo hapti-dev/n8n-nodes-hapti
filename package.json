@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-hapti",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Hapti for n8n: do tasks on websites that have no API. An agent uses a real browser by sight and returns the result with proof, billed only on success.",
   "license": "MIT",
   "homepage": "https://hapti.dev/docs/n8n",
@@ -28,7 +28,7 @@
     "lint:fix": "n8n-node lint --fix",
     "release": "n8n-node release",
     "prepublishOnly": "n8n-node prerelease",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "files": [
     "dist",

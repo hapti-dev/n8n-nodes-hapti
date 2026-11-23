@@ -63,6 +63,11 @@ async function runNode(params, { credentials } = {}) {
     getNode: () => ({ name: 'Hapti', type: 'n8n-nodes-hapti.hapti', typeVersion: 1, parameters: {} }),
     continueOnFail: () => false,
     helpers: {
+      assertBinaryData: (_i, property) => {
+        if (property !== 'attachment_0') throw new Error(`no binary property ${property}`);
+        return { fileName: 'claim-email.png', mimeType: 'image/png' };
+      },
+      getBinaryDataBuffer: async () => Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'),
       httpRequestWithAuthentication: async function (name, opts) {
         assert.equal(name, 'haptiApi');
         const headers = Object.fromEntries(Object.entries(cred.authenticate.properties.headers).map(([k, v]) => [k, String(v).replace('={{$credentials.apiKey}}', creds.apiKey).replace(/^=Bearer \{\{\$credentials\.apiKey\}\}$/, `Bearer ${creds.apiKey}`)]));
@@ -120,4 +125,10 @@ test('Start returns at once, Cancel stops a task, a bad key and bad JSON fail cl
   assert.equal(c.status, 'cancelled');
   await assert.rejects(runNode({ resource: 'task', operation: 'get', taskId: t.id }, { credentials: { apiKey: 'hp_test_wrong', baseUrl: base } }), /Authorization failed/);
   await assert.rejects(runNode({ resource: 'task', operation: 'create', url: 'https://x.example', goal: 'x', options: { data: '{not json' } }), /Data is not valid JSON/);
+});
+
+test('Files sends the binary properties of the item, which the task then lists', async () => {
+  const t = await runNode({ resource: 'task', operation: 'create', url: 'https://portal.example.com', goal: 'Fill the claim from the email screenshot', options: { files: 'attachment_0' } });
+  assert.deepEqual(t.input.files, ['claim-email.png']);
+  await assert.rejects(runNode({ resource: 'task', operation: 'create', url: 'https://portal.example.com', goal: 'x', options: { files: 'missing' } }), /no binary property missing/);
 });
