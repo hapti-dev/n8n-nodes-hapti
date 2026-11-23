@@ -41,7 +41,10 @@ export class Hapti implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				default: 'task',
-				options: [{ name: 'Task', value: 'task' }],
+				options: [
+					{ name: 'Monitor', value: 'monitor', description: 'Watch a website on a schedule and get only what changed' },
+					{ name: 'Task', value: 'task' },
+				],
 			},
 			{
 				displayName: 'Operation',
@@ -60,6 +63,87 @@ export class Hapti implements INodeType {
 				],
 			},
 			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				default: 'watch',
+				displayOptions: { show: { resource: ['monitor'] } },
+				options: [
+					{ name: 'Delete', value: 'remove', action: 'Delete a monitor', description: 'Stop a monitor and delete its values and history' },
+					{ name: 'Get Changes', value: 'changes', action: 'Get the changes of a monitor', description: 'What was added, removed or changed at each check, newest first' },
+					{ name: 'Get Current Value', value: 'latest', action: 'Get the current value of a monitor', description: 'The last value read on the website, as if it had an API' },
+					{ name: 'Get Many', value: 'list', action: 'Get many monitors', description: 'Every monitor with its schedule, last check and last change' },
+					{ name: 'Watch a Website', value: 'watch', action: 'Watch a website', description: 'Check a website on a schedule and report only what changed' },
+				],
+			},
+			{
+				displayName: 'Website URL',
+				name: 'monitorUrl',
+				type: 'string',
+				default: '',
+				required: true,
+				placeholder: 'https://www.agence-exemple.fr/locations',
+				description: 'The page where each check starts',
+				displayOptions: { show: { resource: ['monitor'], operation: ['watch'] } },
+			},
+			{
+				displayName: 'What to Read',
+				name: 'monitorGoal',
+				type: 'string',
+				typeOptions: { rows: 3 },
+				default: '',
+				required: true,
+				placeholder: 'List the flats to rent in Lyon under 900 euros with their title, price and link.',
+				description: 'What the agent reads on the website at each check, in plain words',
+				displayOptions: { show: { resource: ['monitor'], operation: ['watch'] } },
+			},
+			{
+				displayName: 'Every',
+				name: 'every',
+				type: 'string',
+				default: '1h',
+				placeholder: '30m, 1h, 1d',
+				description: 'How often the website is checked. Each check is a task, billed only when it succeeds.',
+				displayOptions: { show: { resource: ['monitor'], operation: ['watch'] } },
+			},
+			{
+				displayName: 'Monitor ID',
+				name: 'monitorId',
+				type: 'string',
+				default: '',
+				required: true,
+				placeholder: 'mon_...',
+				displayOptions: { show: { resource: ['monitor'], operation: ['latest', 'changes', 'remove'] } },
+			},
+			{
+				displayName: 'Limit',
+				name: 'limit',
+				type: 'number',
+				typeOptions: { minValue: 1 },
+				default: 50,
+				description: 'Max number of results to return',
+				displayOptions: { show: { resource: ['monitor'], operation: ['changes'] } },
+			},
+			{
+				displayName: 'Options',
+				name: 'monitorOptions',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				displayOptions: { show: { resource: ['monitor'], operation: ['watch'] } },
+				options: [
+					{ displayName: 'Cron Rule', name: 'cron', type: 'string', default: '', placeholder: '0 8 * * 1-5', description: 'Check on a cron rule instead of Every' },
+					{ displayName: 'Item Key', name: 'key', type: 'string', default: '', placeholder: 'url', description: 'The field that names an item of the list, such as the URL or a reference, so a price change is seen as a change and not as a new item' },
+					{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+					{ displayName: 'Notify After Every Check', name: 'always', type: 'boolean', default: false, description: 'Whether to also send monitor.checked after every check, not only monitor.changed' },
+					{ displayName: 'Output Schema (JSON)', name: 'output', type: 'json', default: '', description: 'A JSON Schema for the value read. Give one: a list inside is compared item by item.' },
+					{ displayName: 'Time Zone', name: 'timezone', type: 'string', default: '', placeholder: 'Europe/Paris' },
+					{ displayName: 'User', name: 'user', type: 'string', default: '', description: 'The person the checks are done for, to use their sign-ins' },
+					{ displayName: 'Webhook URL', name: 'webhook', type: 'string', default: '', description: 'An address that receives monitor.changed' },
+				],
+			},
+			{
 				displayName: 'Website URL',
 				name: 'url',
 				type: 'string',
@@ -67,7 +151,7 @@ export class Hapti implements INodeType {
 				required: true,
 				placeholder: 'https://www.example.com',
 				description: 'The page where the agent starts',
-				displayOptions: { show: { operation: ['run', 'create'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['run', 'create'] } },
 			},
 			{
 				displayName: 'Goal',
@@ -78,7 +162,7 @@ export class Hapti implements INodeType {
 				required: true,
 				placeholder: 'Download the latest invoice and give its total and due date.',
 				description: 'What the agent must do, in plain words, in any language',
-				displayOptions: { show: { operation: ['run', 'create'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['run', 'create'] } },
 			},
 			{
 				displayName: 'Task ID',
@@ -87,7 +171,7 @@ export class Hapti implements INodeType {
 				default: '',
 				required: true,
 				placeholder: 'tsk_...',
-				displayOptions: { show: { operation: ['get', 'answer', 'approve', 'cancel'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['get', 'answer', 'approve', 'cancel'] } },
 			},
 			{
 				displayName: 'Answer',
@@ -96,7 +180,7 @@ export class Hapti implements INodeType {
 				default: '',
 				required: true,
 				description: 'The value the task asked for in pending.text',
-				displayOptions: { show: { operation: ['answer'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['answer'] } },
 			},
 			{
 				displayName: 'Approve',
@@ -104,7 +188,7 @@ export class Hapti implements INodeType {
 				type: 'boolean',
 				default: true,
 				description: 'Whether to let the agent do the step it asked about',
-				displayOptions: { show: { operation: ['approve'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['approve'] } },
 			},
 			{
 				displayName: 'Wait at Most (Minutes)',
@@ -113,7 +197,7 @@ export class Hapti implements INodeType {
 				typeOptions: { minValue: 1, maxValue: 60 },
 				default: 15,
 				description: 'How long the node waits for the task to end or to need someone before it returns the task as it is',
-				displayOptions: { show: { operation: ['run'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['run'] } },
 			},
 			{
 				displayName: 'Options',
@@ -121,7 +205,7 @@ export class Hapti implements INodeType {
 				type: 'collection',
 				placeholder: 'Add Option',
 				default: {},
-				displayOptions: { show: { operation: ['run', 'create'] } },
+				displayOptions: { show: { resource: ['task'], operation: ['run', 'create'] } },
 				options: [
 					{ displayName: 'Data (JSON)', name: 'data', type: 'json', default: '{}', description: 'Values the agent may use, such as names, references or dates. It never invents a missing one.' },
 					{ displayName: 'Files (Binary Properties)', name: 'files', type: 'string', default: '', placeholder: 'data, attachment_0', description: 'Comma-separated binary properties of the input item to give the agent: it reads them (a screenshot, a photo, a scan, a PDF) to type the values they hold, and uploads them when the site asks for a file' },
@@ -153,6 +237,27 @@ export class Hapti implements INodeType {
 					}
 				};
 				const operation = this.getNodeParameter('operation', itemIndex) as string;
+				if (this.getNodeParameter('resource', itemIndex, 'task') === 'monitor') {
+					if (operation === 'watch') {
+						const o = this.getNodeParameter('monitorOptions', itemIndex, {}) as IDataObject;
+						const body: IDataObject = { url: this.getNodeParameter('monitorUrl', itemIndex), goal: this.getNodeParameter('monitorGoal', itemIndex) };
+						if (o.cron) body.cron = o.cron;
+						else body.every = this.getNodeParameter('every', itemIndex, '1h');
+						const output = parseJson(this, o.output, 'Output Schema', itemIndex);
+						if (output && Object.keys(output).length) body.output = output;
+						for (const f of ['key', 'name', 'timezone', 'user', 'webhook']) if (o[f]) body[f] = o[f];
+						if (o.always) body.notify = 'always';
+						out.push({ json: await call('POST', '/v1/monitors', body), pairedItem: itemIndex });
+					} else if (operation === 'list') {
+						for (const m of ((await call('GET', '/v1/monitors')).data as IDataObject[]) ?? []) out.push({ json: m, pairedItem: itemIndex });
+					} else {
+						const id = encodeURIComponent(String(this.getNodeParameter('monitorId', itemIndex)).trim());
+						if (operation === 'latest') out.push({ json: await call('GET', `/v1/monitors/${id}/latest`), pairedItem: itemIndex });
+						else if (operation === 'remove') out.push({ json: await call('DELETE', `/v1/monitors/${id}`), pairedItem: itemIndex });
+						else for (const c of ((await call('GET', `/v1/monitors/${id}/changes?limit=${Math.min(200, Number(this.getNodeParameter('limit', itemIndex, 50)) || 50)}`)).data as IDataObject[]) ?? []) out.push({ json: c, pairedItem: itemIndex });
+					}
+					continue;
+				}
 				let task: IDataObject;
 				if (operation === 'run' || operation === 'create') {
 					const o = this.getNodeParameter('options', itemIndex, {}) as IDataObject;

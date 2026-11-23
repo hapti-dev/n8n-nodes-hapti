@@ -27,6 +27,20 @@ A task needs a **Website URL** and a **Goal** in plain words, in any language. O
 
 The node can also be used as a tool by the n8n AI Agent.
 
+## Watch a website: Monitor and Hapti Trigger
+
+The **Monitor** resource checks a website on a schedule and keeps only what changed: new listings, prices that moved, slots that opened, a file status.
+
+| Operation | What it does |
+| --- | --- |
+| Watch a Website | Creates a monitor: a **Website URL**, **What to Read** in plain words, and **Every** (`30m`, `1h`, `1d`) or a cron rule. Give an **Output Schema** with a list and an **Item Key** such as `url` |
+| Get Current Value | The last value read on the website, as if it had an API |
+| Get Changes | What was added, removed or changed at each check, newest first |
+| Get Many | Every monitor with its last check and last change |
+| Delete | Stops a monitor and deletes its history |
+
+The **Hapti Trigger** node starts a workflow once for each change a monitor finds, with `added`, `removed` and `changed`. Give it a monitor ID, or leave it empty to follow every monitor. Each check is a task, billed only when it succeeds. See [Monitors](https://hapti.dev/docs/monitors).
+
 ## Example
 
 Run, with:

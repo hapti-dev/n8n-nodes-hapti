@@ -9,6 +9,8 @@ const HAPTI = process.env.HAPTI_SERVER ?? `${process.env.HOME}/codes/hapti/serve
 process.env.HAPTI_DB = ':memory:';
 process.env.HAPTI_SECRET = 'test-secret-that-is-long-enough-0123456789';
 process.env.HAPTI_ADMIN_TOKEN = 'admin_test_token_0123456789abcdef';
+process.env.HAPTI_SCHEDULE_MIN_MINUTES = '1';
+const site = { total: 42.5 };
 
 const engine = { tasks: new Map(), n: 0 };
 const engineServer = createServer(async (req, res) => {
@@ -20,7 +22,7 @@ const engineServer = createServer(async (req, res) => {
     const id = `task_${(++engine.n).toString(16).padStart(6, '0')}`;
     const body = JSON.parse(s);
     const asks = /code/.test(body.goal);
-    engine.tasks.set(id, asks ? { id, status: 'waiting', pending: { type: 'question', key: 'code', text: 'Which code?' }, result: null, usage: null } : { id, status: 'succeeded', pending: null, result: { answer: `Done: ${body.goal}`, data: { total: 42.5 } }, usage: { steps: 6 } });
+    engine.tasks.set(id, asks ? { id, status: 'waiting', pending: { type: 'question', key: 'code', text: 'Which code?' }, result: null, usage: null } : { id, status: 'succeeded', pending: null, result: { answer: `Done: ${body.goal}`, data: { total: site.total } }, usage: { steps: 6 } });
     return send(201, { id, status: 'running' });
   }
   const m = req.url.match(/^\/v1\/tasks\/(task_[0-9a-f]+)(?:\/(answer|cancel|proof))?$/);
@@ -35,10 +37,12 @@ const engineServer = createServer(async (req, res) => {
 let hapti;
 let base;
 let key;
+let runDue;
 before(async () => {
   await new Promise((ok) => engineServer.listen(0, '127.0.0.1', ok));
   process.env.HAPTI_ENGINES = `http://127.0.0.1:${engineServer.address().port}|k|5`;
   const { start } = await import(HAPTI);
+  ({ runDue } = await import(HAPTI.replace(/server\.mjs$/, 'lib/schedules.mjs')));
   hapti = await start({ port: 0, every: 500 });
   base = `http://127.0.0.1:${hapti.address().port}`;
   const r = await fetch(`${base}/admin/orgs`, { method: 'POST', headers: { Authorization: `Bearer ${process.env.HAPTI_ADMIN_TOKEN}`, 'Content-Type': 'application/json' }, body: '{"name":"n8n"}' }).then((x) => x.json());
@@ -52,6 +56,7 @@ after(() => {
 
 const { Hapti } = require('../dist/nodes/Hapti/Hapti.node.js');
 const { HaptiApi } = require('../dist/credentials/HaptiApi.credentials.js');
+const { HaptiTrigger } = require('../dist/nodes/HaptiTrigger/HaptiTrigger.node.js');
 
 async function runNode(params, { credentials } = {}) {
   const cred = new HaptiApi();
@@ -78,8 +83,8 @@ async function runNode(params, { credentials } = {}) {
       },
     },
   };
-  const [[out]] = await new Hapti().execute.call(ctx);
-  return out.json;
+  const [out] = await new Hapti().execute.call(ctx);
+  return params.many ? out.map((o) => o.json) : out[0].json;
 }
 
 test('the node is described for n8n: a resource, six operations, a credential checked on the billing endpoint', () => {
@@ -131,4 +136,69 @@ test('Files sends the binary properties of the item, which the task then lists',
   const t = await runNode({ resource: 'task', operation: 'create', url: 'https://portal.example.com', goal: 'Fill the claim from the email screenshot', options: { files: 'attachment_0' } });
   assert.deepEqual(t.input.files, ['claim-email.png']);
   await assert.rejects(runNode({ resource: 'task', operation: 'create', url: 'https://portal.example.com', goal: 'x', options: { files: 'missing' } }), /no binary property missing/);
+});
+
+const httpWith = (creds) => async function (name, opts) {
+  const r = await fetch(opts.url, { method: opts.method, headers: { Authorization: `Bearer ${creds.apiKey}`, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const data = await r.json();
+  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { httpCode: String(r.status) });
+  return data;
+};
+const until = async (check) => {
+  for (let i = 0; i < 100; i++) {
+    const v = await check();
+    if (v) return v;
+    await new Promise((ok) => setTimeout(ok, 100));
+  }
+  throw new Error('timed out');
+};
+
+test('Monitor: watch a website, read its current value and changes, list and delete', async () => {
+  const m = await runNode({ resource: 'monitor', operation: 'watch', monitorUrl: 'https://shop.example.com/lamp', monitorGoal: 'Read the price of the lamp', every: '1h', monitorOptions: { output: '{"type":"object","properties":{"total":{"type":"number"}}}', name: 'Lamp', timezone: 'Europe/Paris' } });
+  assert.match(m.id, /^mon_/);
+  assert.equal(m.every, '60m');
+  await runDue(Date.now() + 1000);
+  const v = await until(async () => { const x = await runNode({ resource: 'monitor', operation: 'latest', monitorId: m.id }); return x.value ? x : null; });
+  assert.deepEqual(v.value, { total: 42.5 });
+  const changes = await runNode({ resource: 'monitor', operation: 'changes', monitorId: m.id, limit: 10, many: true });
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].first, true);
+  assert.ok((await runNode({ resource: 'monitor', operation: 'list', many: true })).some((x) => x.id === m.id));
+  assert.equal((await runNode({ resource: 'monitor', operation: 'remove', monitorId: m.id })).deleted, true);
+});
+
+test('Hapti Trigger starts the workflow once for each new change, never twice, and shows the latest one when tested', async () => {
+  const creds = { apiKey: key, baseUrl: base };
+  const state = {};
+  const pollCtx = (mode, monitorId) => ({
+    getCredentials: async () => creds,
+    getWorkflowStaticData: () => state,
+    getMode: () => mode,
+    getNode: () => ({ name: 'Hapti Trigger', type: 'n8n-nodes-hapti.haptiTrigger', typeVersion: 1, parameters: {} }),
+    getNodeParameter: (name, fallback) => (name === 'monitorId' ? monitorId : fallback),
+    helpers: { httpRequestWithAuthentication: httpWith(creds), returnJsonArray: (a) => a.map((json) => ({ json })) },
+  });
+  const trigger = new HaptiTrigger();
+  assert.equal(trigger.description.polling, true);
+  site.total = 42.5;
+  assert.equal(await trigger.poll.call(pollCtx('trigger', '')), null, 'the first poll only starts from now');
+  await new Promise((ok) => setTimeout(ok, 5));
+  const m = await runNode({ resource: 'monitor', operation: 'watch', monitorUrl: 'https://shop.example.com/desk', monitorGoal: 'Read the price of the desk', every: '1h', monitorOptions: { output: '{"type":"object","properties":{"total":{"type":"number"}}}' } });
+  await runDue(Date.now() + 1000);
+  await until(async () => (await runNode({ resource: 'monitor', operation: 'changes', monitorId: m.id, many: true })).length === 1);
+  const [first] = await trigger.poll.call(pollCtx('trigger', m.id));
+  assert.equal(first.length, 1);
+  assert.equal(first[0].json.monitor, m.id);
+  assert.equal(first[0].json.url, 'https://shop.example.com/desk');
+  assert.equal(first[0].json.first, true);
+  assert.equal(await trigger.poll.call(pollCtx('trigger', m.id)), null, 'a change is never sent twice');
+  site.total = 39.9;
+  await runDue(Date.now() + 2 * 3600e3);
+  await until(async () => (await runNode({ resource: 'monitor', operation: 'changes', monitorId: m.id, many: true })).length === 2);
+  const [second] = await trigger.poll.call(pollCtx('trigger', ''));
+  assert.equal(second.length, 1);
+  assert.deepEqual(second[0].json.changed.map((c) => [c.before.total, c.after.total]), [[42.5, 39.9]]);
+  const [tested] = await trigger.poll.call(pollCtx('manual', m.id));
+  assert.equal(tested.length, 1);
+  assert.equal(tested[0].json.changed[0].after.total, 39.9);
 });
