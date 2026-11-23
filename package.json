@@ -1,0 +1,59 @@
+{
+  "name": "n8n-nodes-hapti",
+  "version": "0.1.0",
+  "description": "Hapti for n8n: do tasks on websites that have no API. An agent uses a real browser by sight and returns the result with proof, billed only on success.",
+  "license": "MIT",
+  "homepage": "https://hapti.dev/docs/n8n",
+  "keywords": [
+    "n8n-community-node-package",
+    "hapti",
+    "browser automation",
+    "computer use",
+    "web automation",
+    "ai agent"
+  ],
+  "author": {
+    "name": "Hapti",
+    "email": "contact@hapti.dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hapti-dev/n8n-nodes-hapti.git"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease",
+    "test": "node --test test/"
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo",
+    "!dist/**/*.map"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/HaptiApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Hapti/Hapti.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "0.57.5",
+    "eslint": "9.32.0",
+    "n8n-workflow": "^2.48.4",
+    "prettier": "3.6.2",
+    "release-it": "^21.1.0",
+    "typescript": "5.9.2"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
